@@ -18,7 +18,8 @@ Heaps/spcm.v
 Heaps/unionmap.v
 Libs/bits.v
 Core/Automata.v
+Core/Temporal.v
 Core/Automata2.v
 Contracts/Puzzle.v
-Contracts/Crowdfunding.v
+Contracts/Crowdfunding2.v
 
