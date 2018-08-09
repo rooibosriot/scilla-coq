@@ -237,6 +237,11 @@ Qed.
 Definition pred : Type := cstate S -> Prop.
 Parameter R : cstate S -> cstate S -> Prop.
 Definition path := nat -> cstate S.
+Parameter cool : cstate S -> cstate s -> Prop.
+Definition gpath : Type := {p : path | forall n, cool (p n) (p (S n))}.
+
+(* proj1_sig *)
+
 Definition first (p : path) := p 0.
 Parameter pth : path.
 Definition path_reachability := forall (n : nat), R (pth n) (pth (n + 1)).
@@ -381,9 +386,11 @@ Section OtherEquivalences.
 End OtherEquivalences.
 
 Definition reachable (st st' : cstate S) :=
-  exists (p : path),
-  exists (n m : nat),
-    p n = st /\ p m = st.
+  exists (p : path), good_path p /\
+  exists (n : nat),
+    p 0 = st /\ p n = st'.
+
+(* forall j, j < m -> step (p j) (p (S j)) *)
 
 (* 
 Definition reachable' (st st' : cstate S) sc :=
