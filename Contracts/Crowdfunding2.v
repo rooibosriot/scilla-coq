@@ -6,7 +6,7 @@ Require Import Eqdep.
 From Heaps
 Require Import pred prelude idynamic ordtype pcm finmap unionmap heap coding. 
 From Contracts
-Require Import Automata2.
+Require Import Automata2. 
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -14,84 +14,7 @@ Unset Printing Implicit Defensive.
 
 Section Crowdfunding.
 (* Encoding of the Crowdfunding contract from the Scilla whitepaper *)
-
-(******************************************************
-contract Crowdfunding
- (owner     : address,
-  max_block : uint,
-  goal      : uint)
-
-(* Mutable state description *)
-{
-  backers : address => uint = [];
-  funded  : boolean = false;
-}
-
-(* Transition 1: Donating money *)
-transition Donate
-  (sender : address, value : uint, tag : string)
-  (* Simple filter identifying this transition *)
-  if tag == "donate" =>
-
-  bs <- & backers;
-  blk <- && block_number;
-  let nxt_block = blk + 1 in
-  if max_block <= nxt_block
-  then send (<to -> sender, amount -> 0,
-	      tag -> main,
-	      msg -> "deadline_passed">, MT)
-  else
-    if not (contains(bs, sender))
-    then let bs1 = put(sbs, ender, value) in
-         backers := bs1;
-         send (<to -> sender,
-                amount -> 0,
-	        tag -> "main",
-	        msg -> "ok">, MT)
-    else send (<to -> sender,
-                amount -> 0,
-	        tag -> "main",
-	        msg -> "already_donated">, MT)
-
-(* Transition 2: Sending the funds to the owner *)
-transition GetFunds
-  (sender : address, value : uint, tag : string)
-  (* Only the owner can get the money back *)
-  if (tag == "getfunds") && (sender == owner) =>
-  blk <- && block_number;
-  bal <- & balance;
-  if max_block >= blk
-  then if goal <= bal
-       then funded := true;
-            send (<to -> owner, amount -> bal,
-                   tag -> "main", msg -> "funded">, MT)
-       else send (<to -> owner, amount -> 0,
-                   tag -> "main", msg -> "failed">, MT)
-  else send (<to -> owner, amount -> 0, tag -> "main",
-   	      msg -> "too_early_to_claim_funds">, MT)
-
-(* Transition 3: Reclaim funds by a backer *)
-transition Claim
-  (sender : address, value : uint, tag : string)
-  if tag == "claim" =>
-  blk <- && block_number;
-  if blk <= max_block
-  then send (<to -> sender, amount -> 0, tag -> "main",
-              msg -> "too_early_to_reclaim">, MT)
-  else bs <- & backers;
-       bal <- & balance;
-       if (not (contains(bs, sender))) || funded ||
-          goal <= bal
-       then send (<to -> sender, amount -> 0,
-                   tag -> "main",
-	           msg -> "cannot_refund">, MT)
-       else
-       let v = get(bs, sender) in
-       backers := remove(bs, sender);
-       send (<to -> sender, amount -> v, tag -> "main",
-              msg -> "here_is_your_money">, MT)
-
- *******************************************************)
+(* Extended with a branching-time temporal logic *)
 
 Record crowdState := CS {
    owner_mb_goal : address * nat * value;
@@ -100,11 +23,9 @@ Record crowdState := CS {
 }.
 
 (* Administrative setters/getters *)
-(** E :  Why have tupled types when you can avoid this with separate types? **)
 Definition get_owner cs : address := (owner_mb_goal cs).1.1.
 Definition get_goal cs : value := (owner_mb_goal cs).2.
 Definition get_max_block cs : nat := (owner_mb_goal cs).1.2.
-
 
 Definition set_backers cs bs : crowdState :=
   CS (owner_mb_goal cs) bs (funded cs).
@@ -118,7 +39,6 @@ Variable init_max_block : nat.
 Variable init_goal : value.
 
 (* Initial state *)
-(** Typo here in the original branch **)
 Definition init_state := CS (init_owner, init_max_block, init_goal) [::] false.
 
 (*********************************************************)
@@ -126,41 +46,12 @@ Definition init_state := CS (init_owner, init_max_block, init_goal) [::] false.
 (*********************************************************)
 
 (* Transition 1 *)
-(*
-transition Donate
-  (sender : address, value : uint, tag : string)
-  (* Simple filter identifying this transition *)
-  if tag == "donate" =>
-
-  bs <- & backers;
-  blk <- && block_number; 
-  let nxt_block = blk + 1 in
-  if max_block <= nxt_block
-  then send (<to -> sender, amount -> 0,
-	      tag -> main,
-	      msg -> "deadline_passed">, MT)
-  else
-    if not (contains(bs, sender))
-    then let bs1 = put(sbs, ender, value) in
-         backers := bs1;
-         send (<to -> sender,
-                amount -> 0,
-	        tag -> "main",
-	        msg -> "ok">, MT)
-    else send (<to -> sender,
-                amount -> 0,
-	        tag -> "main",
-	        msg -> "already_donated">, MT)
- *)
-
-(* Definition of the protocol *)
 Variable crowd_addr : address.
 
 Notation tft := (trans_fun_type crowdState).
 Definition ok_msg := [:: (0, [:: 1])].
 Definition no_msg := [:: (0, [:: 0])].
 
-(* The donate function doesn't actually change the balance *)
 Definition donate_tag := 1.
 Definition donate_fun : tft := fun id bal s m bc =>
   if method m == donate_tag then
@@ -178,30 +69,9 @@ Definition donate_fun : tft := fun id bal s m bc =>
          else (s, Some (Msg 0 crowd_addr from 0 no_msg)) (* (1) *)
   else (s, None).
 
-(* Donate merely appends the backer and his value *)
-(* So what does the contract state's balance keep track of? *)
-
 Definition donate := CTrans donate_tag donate_fun.
 
 (* Transition 2: Sending the funds to the owner *)
-(*
-transition GetFunds
-  (sender : address, value : uint, tag : string)
-  (* Only the owner can get the money back *)
-  if (tag == "getfunds") && (sender == owner) =>
-  blk <- && block_number;
-  bal <- & balance;
-  if max_block < blk
-  then if goal <= bal
-       then funded := true;   
-            send (<to -> owner, amount -> bal,
-                   tag -> "main", msg -> "funded">, MT)
-       else send (<to -> owner, amount -> 0,
-                   tag -> "main", msg -> "failed">, MT)
-  else send (<to -> owner, amount -> 0, tag -> "main",
-   	      msg -> "too_early_to_claim_funds">, MT)
- *)
-
 (* Only the owner can request funds *)
 (* The owner flips the funded boolean to indicate that the funds have been
 collected by him, backers are allowed to donate regardless of whether
@@ -227,28 +97,6 @@ Definition getfunds_fun : tft := fun id bal s m bc =>
 Definition get_funds := CTrans getfunds_tag getfunds_fun.
 
 (* Transition 3: Reclaim funds by a backer *)
-(*
-transition Claim
-  (sender : address, value : uint, tag : string)
-  if tag == "claim" =>
-  blk <- && block_number;
-  if blk <= max_block
-  then send (<to -> sender, amount -> 0, tag -> "main",
-              msg -> "too_early_to_reclaim">, MT)
-  else bs <- & backers;
-       bal <- & balance;
-       if (not (contains(bs, sender))) || funded ||
-          goal <= bal
-       then send (<to -> sender, amount -> 0,
-                   tag -> "main",
-	           msg -> "cannot_refund">, MT)
-       else
-       let v = get(bs, sender) in
-       backers := remove(bs, sender);
-       send (<to -> sender, amount -> v, tag -> "main",
-              msg -> "here_is_your_money">, MT)
-*)
-
 Definition claim_tag := 3.
 Definition claim_fun : tft := fun id bal s m bc =>
   let: from := sender m in
@@ -286,14 +134,13 @@ Program Definition crowd_prot : Protocol crowdState :=
 Lemma crowd_tags : tags crowd_prot = [:: 1; 2; 3].
 Proof. by []. Qed.
 
-(*
-Lemma find_leq {A : eqType} (p : pred (A * nat)) (bs : seq (A * nat)) :
+(* Added an ssrbool prefix here to avoid confusion with temporal pred *)
+Lemma find_leq {A : eqType} (p : ssrbool.pred (A * nat)) (bs : seq (A * nat)) :
   nth 0 [seq i.2 | i <- bs] (seq.find p bs) <= sumn [seq i.2 | i <- bs].
 Proof.
 elim: bs=>//[[a w]]bs/=Gi; case:ifP=>_/=; first by rewrite leq_addr.
 by rewrite (leq_trans Gi (leq_addl w _)).
 Qed.
-*)
 
 (***********************************************************)
 (**             Correctness properties                    **)
@@ -319,8 +166,77 @@ Definition balance_backed (st: cstate crowdState) : Prop :=
   ~~ (funded (state st)) ->
   (* the contract has enough funds to reimburse everyone. *)
   sumn (map snd (backers (state st))) <= balance st.
+Print path.
 
-Check safe.
-Lemma sufficient_funds_safe : safe crowd_prot balance_backed.
-  
+Lemma sufficient_funds_safe :
+  forall p : (path crowdState),
+  forall n : nat,
+    balance_backed (p n).
+Proof.
+Abort.
+
+(***********************************************************************)
+(******           Proving temporal properties                     ******)
+(***********************************************************************)
+
+(* Contribution of backer b is d is recorded in the `backers` *)
+Definition donated b (d : value) st :=
+  (filter [pred e | e.1 == b] (backers (state st))) == [:: (b, d)].
+
+(* b doesn't claim its funding back *)
+Definition no_claims_from b (q : bstate * message) := sender q.2 != b.
+
+(************************************************************************
+2. The following lemma shows that the donation record is going to be
+preserved by the protocol since the moment it's been contributed, as
+long, as no messages from the corresponding backer b is sent to the
+contract. This guarantees that the contract doesn't "drop" the record
+about someone's donations.
+
+In conjunctions with sufficient_funds_safe (proved above) this
+guarantees that, if the campaign isn't funded, there is always a
+necessary amount on the balance to reimburse each backer, in the case
+of failure of the campaign.
+************************************************************************)
+
+(* This one is a little bit trickier to translate into modal logic *)
+(* Lemma donation_preserved (b : address) (d : value):
+  since_as_long crowd_prot (donated b d)
+                (fun _ s' => donated b d s') (no_claims_from b). *)
+
+
+(************************************************************************
+3. The final property: if the campaign has failed (goal hasn't been
+reached and the deadline has passed), every registered backer can get
+its donation back.
+TODO: formulate and prove it.
+************************************************************************)
+
+Lemma can_claim_back b d st bc:
+  (* We have donated, so the contract holds that state *)
+  donated b d st ->
+  (* Not funded *)
+  ~~(funded (state st)) ->
+  (* Balance is small: not reached the goal *)
+  balance st < (get_goal (state st)) ->
+  (* Block number exceeds the set number *)
+  get_max_block (state st) < block_num bc ->
+  (* Can emit message from b *)
+  exists (m : message),
+    sender m == b /\
+    out (step_prot crowd_prot st bc m) = Some (Msg d crowd_addr b 0 ok_msg).
+Proof.
+move=>D Nf Nb Nm.
+exists (Msg 0 b crowd_addr claim_tag [::]); split=>//.
+rewrite /step_prot.
+case: st D Nf Nb Nm =>id bal s/= D Nf Nb Nm.
+rewrite /apply_prot/=/claim_fun/=leqNgt Nm/= leqNgt Nb/=.
+rewrite /donated/= in D.
+move/negbTE: Nf=>->/=; rewrite -(has_find [pred e | e.1 == b]) has_filter.
+move/eqP: D=>D; rewrite D/=.
+congr (Some _); congr (Msg _ _ _ _ _). 
+elim: (backers s) D=>//[[a w]]bs/=; case:ifP; first by move/eqP=>->{a}/=_; case. 
+by move=>X Hi H; move/Hi: H=><-. 
+Qed.
+
 End Crowdfunding.

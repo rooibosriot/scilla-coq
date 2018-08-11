@@ -234,9 +234,7 @@ Definition path := nat -> cstate S.
 Definition path_predicate (p : path) := forall n, R (p n) (p (n + 1)).
 Definition gpath : Type := {p : path & path_predicate p }.
 
-(* Parameter gpath : {p : path & path_predicate p }. 
-
-
+(* 
 Definition projT1 (x:sigT path_predicate) : path := match x with
                                       | existT a _ => a
                                                     end.
@@ -252,8 +250,7 @@ Definition gpath_proj1 : gpath -> (nat -> cstate S) := fun gp =>  match gp with 
 Definition gpath_proj1' : (sigT path_predicate) -> (nat -> cstate S) := fun gp => match gp with |existT a _ => a end.
 Lemma blah : gpath_proj1 = gpath_proj1'.
   reflexivity.
-Locate sigT.
-
+Qed.
 Coercion gpath_proj1 : gpath >-> Funclass.
 
 Definition first (p : gpath) : cstate S := p 0.
@@ -370,7 +367,7 @@ Definition safe (P : pred) (p : path) :=
   forall n : nat, P (p n).
 
 Lemma safe_ind :
-  forall (P : pred) (p : path),
+  forall (P : pred) (p : gpath),
   P (p 0) ->
   (forall n : nat, P (p n) -> P (p (n.+1))) ->
                   forall n : nat, P (p n).
