@@ -22,9 +22,7 @@ Tactic Notation "spec" hyp(H) constr(a) constr(b) constr(c) :=
 Tactic Notation "spec" hyp(H) constr(a) constr(b) constr(c) constr(d) :=
   (generalize (H a b c d); clear H; intro H).
 
-
 (* A semantics of contracts with decidable deterministic transitions *)
-
 Section State.
 
 Definition value := nat.
@@ -51,13 +49,12 @@ Record cstate (T : Type) := CState {
 (* Global blockchain state *)
 Record bstate := BState {
       block_num : nat;
-      (* Anything else? *)
 }.
 
 End State.
 
 Section Protocol.
-
+  
 Section Transitions.
 
 (* State type *)
@@ -77,7 +74,7 @@ Record ctransition :=
       (* Unique tag of a transition in the protocol *)
       ttag : tag;
       
-      (* Funcion (bstate, state, msg) :-> (state', option msg') *)
+      (* Function (bstate, state, msg) :-> (state', option msg') *)
       tfun : trans_fun_type;
   }.
 
@@ -119,45 +116,30 @@ Fixpoint wf_sched (sch : schedule) :=
        all [pred s' | bnum <= block_num s'.1] sch' && wf_sched sch'
   else true.
 
-Record step :=
-  Step {
-      pre  : cstate S;
-      post : cstate S;
-      out  : option message
-  }.
-
-Definition trace := seq step.
-
-Definition apply_prot id bal s m bc : (S * option message) :=
-  let n  := seq.find (fun t => ttag t == method m) (transitions p) in
-  let tr := nth (idle S) (transitions p) n in
-  let f  := tfun tr in
-  f id bal s m bc.
-
-Definition step_prot pre bc m : step :=
+Definition step_state pre bc m : cstate S :=
   let: CState id bal s := pre in
-  let: (s', out) := apply_prot id bal s m bc in
+  let: n := seq.find (fun t => ttag t == method m) (transitions p) in
+  let: tr := nth (idle S) (transitions p) n in
+  let: (s', out) := (tfun tr) id bal s m bc in
   let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
-  let: post := CState id bal' s' in
-  Step pre post out.
+  CState id bal' s'.
 
-(* Map a schedule into a trace *)
+(* Map a schedule into a trace 
 Fixpoint execute (pre : cstate S) (sc: schedule) : trace :=
   if sc is (bc, m) :: sc'
   then let stp := step_prot pre bc m in
        stp :: execute (post stp) sc'
-  else [::].
-
+  else [::]. *)
 
 
 Definition state0 := CState (acc p) (init_bal p) (init_state p).
 
 (* Execute from the initial contract state,
-   if schedule is empty, repeat the initial state *)
+   if schedule is empty, repeat the initial state 
 Definition execute0 sc :=
   if sc is _ :: _
   then execute state0 sc
-  else [:: Step state0 state0 None].
+  else [:: Step state0 state0 None]. *)
 
 (****************************************************************)
 (* Safety property:
@@ -168,7 +150,7 @@ the unary property I holds (i.e., I s).
 (* Definition safe (I : cstate S -> Prop) : Prop :=
   forall sc pre post out,
     Step pre post out \In execute0 sc -> I pre /\ I post. *)
-
+(* 
 Lemma bad_tag_step bc m s :
   method m \notin (tags p) -> post (step_prot s bc m) = s.
 Proof.
@@ -186,7 +168,7 @@ elim: (transitions p) G M=>//t ts Hi/=.
 case/orP; last by move/Hi=>{Hi} Hi H; apply: Hi; rewrite inE in H; case/norP: H.
 by move/eqP=>->; rewrite inE eqxx.
 Qed.
-  
+  *)
 (* A strong induction principle for proving safety *)
 (* Lemma safe_ind (I : cstate S -> Prop) :
   I state0 ->
@@ -226,12 +208,14 @@ Qed.
 (*****************************************************)
 Definition pred := cstate S -> Prop.
 (* R needs to be implemented via the transitions *)
-Parameter R : cstate S -> cstate S -> Prop.
+Check step_state.
+Definition reachability : cstate S -> cstate S -> Prop := fun s1 s2 =>
+                                                          exists (bc : bstate) (m : message),
+                                                            step_state s1 bc m = s2.
 Definition path := nat -> cstate S.
-(* gpath is a sigma type *)
-(* Currently reachability is lazily defined as parameter R *)
 
-Definition path_predicate (p : path) := forall n, R (p n) (p (n + 1)).
+(* A good path is a path that begins with the initial state and satisfies the reachability relation *)
+Definition path_predicate (p : path) := p 0 = state0 /\ forall n, reachability (p n) (p (n + 1)).
 Definition gpath : Type := {p : path & path_predicate p }.
 
 (* 

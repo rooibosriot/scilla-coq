@@ -12,9 +12,10 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Section Crowdfunding.
 (* Encoding of the Crowdfunding contract from the Scilla whitepaper *)
 (* Extended with a branching-time temporal logic *)
+
+Section Crowdfunding.
 
 Record crowdState := CS {
    owner_mb_goal : address * nat * value;
