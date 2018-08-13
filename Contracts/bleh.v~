@@ -1,8 +1,0 @@
-Require Import Classical Omega.
-
-Parameter A B C : Prop.
-
-Lemma bleh : (B -> C) <-> (A /\ B) -> (A /\ C).
-Proof.
-  split.
-  

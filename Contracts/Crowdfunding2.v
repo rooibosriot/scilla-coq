@@ -243,34 +243,5 @@ Lemma can_claim_back (n : address) (d : value) (bc : bstate) :
   forall cs : cstate crowdState,
     AllWait (campaign_failed n d bc) (get_funds_from_pred n) cs.
   Proof. Abort.
-
-(* 
-Lemma can_claim_back b d st bc:
-  (* We have donated, so the contract holds that state *)
-  donated b d st ->
-  (* Not funded *)
-  ~~(funded (state st)) ->
-  (* Balance is small: not reached the goal *)
-  balance st < (get_goal (state st)) ->
-  (* Block number exceeds the set number *)
-  get_max_block (state st) < block_num bc ->
-  (* Can emit message from b *)
-  exists (m : message),
-    sender m == b /\
-    out (step_prot crowd_prot st bc m) = Some (Msg d crowd_addr b 0 ok_msg).
-Proof.
-move=>D Nf Nb Nm.
-exists (Msg 0 b crowd_addr claim_tag [::]); split=>//.
-rewrite /step_prot.
-case: st D Nf Nb Nm =>id bal s/= D Nf Nb Nm.
-rewrite /apply_prot/=/claim_fun/=leqNgt Nm/= leqNgt Nb/=.
-rewrite /donated/= in D.
-move/negbTE: Nf=>->/=; rewrite -(has_find [pred e | e.1 == b]) has_filter.
-move/eqP: D=>D; rewrite D/=.
-congr (Some _); congr (Msg _ _ _ _ _). 
-elim: (backers s) D=>//[[a w]]bs/=; case:ifP; first by move/eqP=>->{a}/=_; case. 
-by move=>X Hi H; move/Hi: H=><-. 
-Qed.
- *)
   
 End Crowdfunding.
