@@ -167,14 +167,8 @@ Definition balance_backed (st: cstate crowdState) : Prop :=
   ~~ (funded (state st)) ->
   (* the contract has enough funds to reimburse everyone. *)
   sumn (map snd (backers (state st))) <= balance st.
-Print path.
-
-Lemma sufficient_funds_safe :
-  forall p : (path crowdState),
-  forall n : nat,
-    balance_backed (p n).
-Proof.
-Abort.
+Lemma temporal_balance_backed : forall (st : cstate crowdState), AllBox balance_backed st.
+Proof. Abort.
 
 (***********************************************************************)
 (******           Proving temporal properties                     ******)
@@ -185,34 +179,72 @@ Definition donated b (d : value) st :=
   (filter [pred e | e.1 == b] (backers (state st))) == [:: (b, d)].
 
 (* b doesn't claim its funding back *)
-Definition no_claims_from b (q : bstate * message) := sender q.2 != b.
+(* Definition no_claims_from b (q : bstate * message) := sender q.2 != b. *)
+(* This lemma needs to be reformulated to be state-based *)
+(* The previous formulation is slightly problematic and temporally unsound *)
+(* I want to say something along the lines of 
+a state transition occurred by virtue of a claim funds message from b *)
+Check step_state.
+(* There doesn't exist a state whereby a previous state reached it via a send 
+claim message transition *)
+Print message.
+Definition no_claims_from (n : address) : pred crowdState := fun cs1 =>
+                                                               ~ (exists (cs2 : cstate crowdState)
+                                                                         (bs : bstate)
+                                                                         (m : message),
+                                                                     step_state crowd_prot cs1 bs m = cs2 /\ sender m = n).
 
 (************************************************************************
-2. The following lemma shows that the donation record is going to be
-preserved by the protocol since the moment it's been contributed, as
-long, as no messages from the corresponding backer b is sent to the
-contract. This guarantees that the contract doesn't "drop" the record
+2. The following lemma guarantees that the contract doesn't "drop" the record
 about someone's donations.
-
-In conjunctions with sufficient_funds_safe (proved above) this
-guarantees that, if the campaign isn't funded, there is always a
-necessary amount on the balance to reimburse each backer, in the case
-of failure of the campaign.
 ************************************************************************)
 
 (* This one is a little bit trickier to translate into modal logic *)
+Lemma temporal_donation_preserved (b : address) (d : value) :
+  forall (cs : cstate crowdState),
+    AllWait (donated b d) (no_claims_from b) cs.
+Proof. Abort.
 (* Lemma donation_preserved (b : address) (d : value):
   since_as_long crowd_prot (donated b d)
                 (fun _ s' => donated b d s') (no_claims_from b). *)
 
 
 (************************************************************************
-3. The final property: if the campaign has failed (goal hasn't been
-reached and the deadline has passed), every registered backer can get
+3. The final property: if the campaign has failed, every registered backer can get
 its donation back.
-TODO: formulate and prove it.
-************************************************************************)
+ *************************************************************************)
 
+Definition notfunded_pred : pred crowdState := fun cs => funded (state cs) = false.
+Definition donated_pred (b : address) (d : value) : pred crowdState := fun cs => donated b d cs.
+Definition balance_exceeded_pred : pred crowdState := fun cs => balance cs < (get_goal (state cs)).
+Definition block_exceeded (bc : bstate) : pred crowdState := fun cs => get_max_block (state cs) < block_num bc.
+
+Definition campaign_failed (b : address) (d : value) (bc : bstate) : pred crowdState := fun cs => 
+    Conj (block_exceeded bc) (Conj balance_exceeded_pred (Conj notfunded_pred (donated_pred b d))) cs.
+
+Definition claim_from (n : address) : pred crowdState := fun cs =>
+                                                           exists (cs' : cstate crowdState)
+                                                                  (bs : bstate)
+                                                                  (m : message),
+                                                             step_state crowd_prot cs bs m = cs' /\ sender m = n.
+(* This is a more expressive "claim_from" pred *)
+Definition step_get_funds_state pre bc m : cstate crowdState :=
+  let: CState id bal s := pre in
+  let: (s', out) := getfunds_fun id bal s m bc in
+  let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
+  CState id bal' s'.
+Definition get_funds_from_pred (n : address) : pred crowdState := fun cs =>
+                                                      exists (cs' : cstate crowdState)
+                                                             (bc : bstate)
+                                                             (m : message),
+                                                        cs = step_get_funds_state cs bc m
+                                                                                  /\ sender m = n.
+Lemma can_claim_back (n : address) (d : value) (bc : bstate) :
+  forall cs : cstate crowdState,
+    AllWait (campaign_failed n d bc) (get_funds_from_pred n) cs.
+  Proof. Abort.
+
+(* 
 Lemma can_claim_back b d st bc:
   (* We have donated, so the contract holds that state *)
   donated b d st ->
@@ -239,5 +271,6 @@ congr (Some _); congr (Msg _ _ _ _ _).
 elim: (backers s) D=>//[[a w]]bs/=; case:ifP; first by move/eqP=>->{a}/=_; case. 
 by move=>X Hi H; move/Hi: H=><-. 
 Qed.
-
+ *)
+  
 End Crowdfunding.
