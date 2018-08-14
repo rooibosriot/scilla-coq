@@ -167,6 +167,35 @@ Definition Disj P Q : pred := fun w =>
 Definition Impl P Q : pred := fun w =>
                                 ~(w |= P) \/ (w |= Q).
 
+
+(* Temporal operator definitions *)
+Definition AllNext (P : pred) : pred := fun w =>  
+  forall p : gpath, first p = w ->
+            p 1 |= P.
+Definition ExistsNext (P : pred) : pred := fun w =>  
+  exists p : gpath, first p = w ->
+            p 1 |= P.
+Definition AllBox P : pred := fun w =>  
+  forall p : gpath, first p = w ->
+            forall n, p n |= P.
+Definition ExistsBox P : pred := fun w =>  
+  exists p : gpath, first p = w ->
+            forall n, p n |= P.
+Definition AllFuture P : pred := fun w =>  
+  forall p : gpath, first p = w ->
+            exists n, p n |= P.
+Definition ExistsFuture P : pred := fun w =>  
+  exists p : gpath, first p = w ->
+            exists n, p n |= P.
+Definition AllUntil P Q : pred := fun w =>  
+  forall p : gpath, first p = w ->
+            exists n, p n |= Q /\
+                      forall m, m < n -> p m |= P.
+Definition ExistsUntil P Q : pred := fun w =>  
+  exists p : gpath, first p = w ->
+            exists n, p n |= Q /\
+                      forall m, m < n -> p m |= P.
+
 Delimit Scope temporal_logic with temporal_logic.
 Open Scope temporal_logic.
 
@@ -175,34 +204,6 @@ Notation "~~ P" := (Neg P) : temporal_logic.
 Notation "P & Q" := (Conj P Q) (at level 65, left associativity) : temporal_logic.
 Notation "P || Q" := (Disj P Q) : temporal_logic.
 Notation "P --> Q" := (Impl P Q) (at level 35, no associativity) : temporal_logic.
-
-(* Temporal operator definitions *)
-Definition AllNext (P : pred) : pred := fun w =>  
-  forall p, first p = w ->
-            p 1 |= P.
-Definition ExistsNext (P : pred) : pred := fun w =>  
-  exists p, first p = w ->
-            p 1 |= P.
-Definition AllBox P : pred := fun w =>  
-  forall p, first p = w ->
-            forall n, p n |= P.
-Definition ExistsBox P : pred := fun w =>  
-  exists p, first p = w ->
-            forall n, p n |= P.
-Definition AllFuture P : pred := fun w =>  
-  forall p, first p = w ->
-            exists n, p n |= P.
-Definition ExistsFuture P : pred := fun w =>  
-  exists p, first p = w ->
-            exists n, p n |= P.
-Definition AllUntil P Q : pred := fun w =>  
-  forall p, first p = w ->
-            exists n, p n |= Q /\
-                      forall m, m < n -> p m |= P.
-Definition ExistsUntil P Q : pred := fun w =>  
-  exists p, first p = w ->
-            exists n, p n |= Q /\
-                      forall m, m < n -> p m |= P.
 
 (* Temporal operator extensions *)
 Definition AllRelease P Q : pred := 
@@ -214,33 +215,37 @@ Definition AllWait P Q : pred :=
 Definition ExistsWait P Q : pred :=
   ExistsRelease P (P || Q).
 
-Close Scope temporal_logic.
+End Semantics.
+
+Delimit Scope temporal_logic with temporal_logic.
+
+Notation "P <=> Q" := (equiv P Q) (at level 35, no associativity).
+Notation "~~ P" := (Neg P) : temporal_logic.
+Notation "P & Q" := (Conj P Q) (at level 65, left associativity) : temporal_logic.
+Notation "P || Q" := (Disj P Q) : temporal_logic.
+Notation "P --> Q" := (Impl P Q) (at level 35, no associativity) : temporal_logic.
 
 (* Given the sigma-type gpath, we can safely say this
 because gpath will handle the proof of reachability *)
-Definition reachable (st st' : cstate S) :=
-  exists (p : gpath),
+Definition reachable (S : Type) (P : Protocol S) (st st' : cstate S) :=
+  exists (p : gpath P),
   exists (n m : nat),
     p n = st /\ p m = st.
 
 (* A stronger safety property *)
-(* The former safety property said that all states in a viable execution path
-hold a certain property *)
-(* If we assume that "path" already comes with a viability *)
-Definition safe (P : pred) (p : gpath) :=
-  forall n : nat, P (p n).
+Definition safe  (S : Type) (P : Protocol S) (pr : pred S) (pth : gpath P) :=
+  forall n : nat, pr (pth n).
 
 Lemma safe_ind :
-  forall (P : pred) (p : gpath),
-  P (p 0) ->
-  (forall n : nat, P (p n) -> P (p (n.+1))) ->
-                  forall n : nat, P (p n).
+  forall  (S : Type) (P : Protocol S) (pr : pred S) (p : gpath P),
+  pr (p 0) ->
+  (forall n : nat, pr (p n) -> pr (p (n.+1))) ->
+                  forall n : nat,  pr(p n).
 Proof.
   intros P path.
-  intros H_0 HI m. 
-  elim m.
-  exact H_0.
-  apply HI.
+  intros H_0 HI m.
+  intro.
+  induction n.
+  exact m.
+  apply H. exact IHn.
 Qed. 
-
-End Semantics.
