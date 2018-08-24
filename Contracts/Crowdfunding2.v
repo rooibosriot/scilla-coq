@@ -140,15 +140,16 @@ Qed.
 1. Until the funded flag has been flipped, meaning that the owner got the
 funds, the contract will have enough funds to reimburse every backer.
  ************************************************************************)
-Definition notfunded_pred : pred crowdState := fun cs =>
-                                                 funded (state cs) = false.
-Definition balance_sufficient_pred : pred crowdState := fun cs =>
-                                                          sumn (map snd (backers (state cs))) <= balance cs.
+(* Important reminder: supply pred S with crowdState and not world crowdState *)
+Definition notfunded_pred : pred crowdState := fun w =>
+                                                 funded (state (st w)) = false.
+Definition balance_sufficient_pred : pred crowdState := fun s =>
+                                                          sumn (map snd (backers (state (st s)))) <= balance (st s).
 
 Open Scope temporal_logic.
 Lemma temporal_balance_backed :
-  forall (cs : cstate crowdState),
-    AllBox crowd_prot (notfunded_pred --> balance_sufficient_pred) cs.
+  forall (w : world crowdState),
+    AllBox crowd_prot (notfunded_pred --> balance_sufficient_pred) w.
 Proof.
   intro s.
   unfold AllBox.
@@ -160,69 +161,81 @@ Proof.
   unfold forces.
   destruct p.
   unfold path_predicate in p.
+  unfold reachability in p.
+  unfold step_state in p.
+  (* Study Ilya's original proof *)
 Admitted.
 
 (************************************************************************
 2. Until the backer claims his donation back, the contract doesn't drop
 the records of each backer's donations.
-************************************************************************)
-Definition donated_pred (b : address) (d : value) : pred crowdState := fun cs =>
-                                                                         (filter [pred e | e.1 == b] (backers (state cs))) == [:: (b, d)].
-Definition step_claim_state pre bc m : cstate crowdState :=
+ ************************************************************************)
+Definition donated_pred (b : address) (d : value) : pred crowdState := fun s =>
+                                                                         (filter [pred e | e.1 == b] (backers (state (st s)))) == [::(b, d)].
+                                                                               
+
+(* Definition step_world (w : world) : world :=
+  let: CState id bal s := st w in
+  let: bc := b w in
+  let: m := inFlight w in
+  let: n := seq.find (fun t => ttag t == method m) (transitions p) in
+  let: tr := nth (idle S) (transitions p) n in
+  let: (s', out) := (tfun tr) id bal s m bc in
+  let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
+  mkW m (CState id bal' s') bc out. *)
+
+(* Definition step_claim_world (w : world crowdState) : world crowdState :=
+  let: CState id bal s := st w in
+  let: bc := b w in
+  let: m := inFlight w in
+  let: (s', out) := claim_fun id bal s m bc in
+  let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
+  mkW m (CState id bal' s') bc out. *)
+  
+(* Definition step_claim_state pre bc m : cstate crowdState :=
   let: CState id bal s := pre in
   let: (s', out) := claim_fun id bal s m bc in
   let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
-  CState id bal' s'.
-Definition no_claims_from_pred (n : address) : pred crowdState := fun cs =>
-                                                                    ~ exists (cs' : cstate crowdState)
-                                                                             (bs : bstate)
-                                                                             (m : message),
-                                                                        step_claim_state cs bs m = cs' /\ sender m = n.
+  CState id bal' s'. *)
+
+(* Definition reachable_via_message_sender (cs1 cs2 : cstate crowdState) : address -> Prop := fun n => 
+  exists (bc : bstate) (m : message),
+    step_state P cs1 bc m = cs2 /\ sender m = n. *)
+
+(* This can't be defined solely in pred because the statement is about messages *)
+Definition claim_from_pred (n : address) : pred crowdState := fun w =>
+                                                                sender (inFlight w) = n.
+
 Lemma temporal_donation_preserved (b : address) (d : value) :
-  forall (cs : cstate crowdState),
-    AllWait crowd_prot (donated_pred b d) (no_claims_from_pred b) cs.
+  forall (w : world crowdState),
+    (donated_pred b d w) -> AllWait crowd_prot (donated_pred b d) (claim_from_pred b) w.
 Proof. Abort.
 
 (************************************************************************
 3. The final property: if the campaign has failed, every registered backer 
 can get its donation back.
  *************************************************************************)
-Definition balance_exceeded_pred : pred crowdState := fun cs => balance cs < (get_goal (state cs)).
-Definition block_exceeded (bc : bstate) : pred crowdState := fun cs => get_max_block (state cs) < block_num bc.
+Definition balance_exceeded_pred : pred crowdState := fun w => balance (st w) < (get_goal (state (st w))).
+Definition block_exceeded (bc : bstate) : pred crowdState := fun w => get_max_block (state (st w)) < block_num bc.
 
-Definition campaign_failed (b : address) (d : value) (bc : bstate) : pred crowdState := fun cs => 
-    Conj (block_exceeded bc) (Conj balance_exceeded_pred (Conj notfunded_pred (donated_pred b d))) cs.
+Definition campaign_failed (b : address) (d : value) (bc : bstate) : pred crowdState := fun w => 
+    (block_exceeded bc & balance_exceeded_pred & notfunded_pred & donated_pred b d) w.
 
-Definition claim_funds_from_pred (n : address) : pred crowdState := fun cs =>
-                                                      exists (cs' : cstate crowdState)
-                                                             (bc : bstate)
-                                                             (m : message),
-                                                        cs = step_claim_state cs bc m
-                                                                                  /\ sender m = n.
 Lemma can_claim_back (n : address) (d : value) (bc : bstate) :
-  forall cs : cstate crowdState,
-    AllWait crowd_prot (campaign_failed n d bc) (claim_funds_from_pred n) cs.
+  forall w : world crowdState,
+    AllWait crowd_prot (campaign_failed n d bc) (claim_from_pred n) w.
 Proof. Abort.
 
 (************************************************************************
 4. The additional property: if the campaign has succeeded, the owner can 
 get funds to kickstart the campaign.
  *************************************************************************)
-Definition step_get_funds_state pre bc m : cstate crowdState :=
-  let: CState id bal s := pre in
-  let: (s', out) := getfunds_fun id bal s m bc in
-  let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
-  CState id bal' s'.
-Definition owner_gets_funds_pred : pred crowdState := fun cs =>
-                                                   ~ exists (cs' : cstate crowdState)
-                                                            (bs : bstate)
-                                                            (m : message),
-                                                       step_get_funds_state cs bs m = cs' /\
-                                                       sender m = get_owner (state cs).      
-                                              
+Definition owner_gets_funds_pred : pred crowdState := fun w =>
+                                                        sender (inFlight w) = get_owner (state (st w)).
+                                                     
 Lemma can_get_funds :
-  forall cs : cstate crowdState,
-    AllBox crowd_prot (Impl balance_exceeded_pred owner_gets_funds_pred) cs.
+  forall w : world crowdState,
+    AllBox crowd_prot (balance_exceeded_pred --> owner_gets_funds_pred) w.
 Proof. Abort.
 
 End Crowdfunding.

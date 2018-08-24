@@ -130,21 +130,44 @@ Definition state0 := CState (acc p) (init_bal p) (init_state p).
 (*            Some modal connectives                 *)
 (*****************************************************)
 (* A temporal CTL semantics *)
-Definition pred := cstate S -> Prop.
+Record world :=
+  mkW {
+      inFlight : message;
+      st : cstate S;
+      b : bstate;
+      outFlight : option message
+    }.
+Parameter emptymsg : message.
+Parameter b0 : bstate.
+Definition world0 := mkW emptymsg state0 b0 None.
+Definition step_world (w : world) : world :=
+  let: CState id bal s := st w in
+  let: bc := b w in
+  let: m := inFlight w in
+  let: n := seq.find (fun t => ttag t == method m) (transitions p) in
+  let: tr := nth (idle S) (transitions p) n in
+  let: (s', out) := (tfun tr) id bal s m bc in
+  let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
+  mkW m (CState id bal' s') bc out.
+  
+Definition pred := world -> Prop.
+(*
 Definition reachability : cstate S -> cstate S -> Prop := fun s1 s2 =>
                                                           exists (bc : bstate) (m : message),
-                                                            step_state s1 bc m = s2.
-Definition path := nat -> cstate S.
-Definition first (p : path) : cstate S := p 0. 
+                                                            step_state s1 bc m = s2. *)
+
+Definition reachability : world -> world  -> Prop := fun w1 w2 => step_world w1 = w2.
+Definition path := nat -> world.
+Definition first (p : path) : world := p 0. 
 
 (* A good path is a path that begins with the initial state and satisfies the reachability relation *)
 Definition path_predicate (p : path) := (* p 0 = state0 /\ *) forall n, reachability (p n) (p (n + 1)).
 Definition gpath : Type := {p : path & path_predicate p }.
-Definition gpath_proj1 : gpath -> (nat -> cstate S) := fun gp =>  match gp with | existT a _ => a end.
+Definition gpath_proj1 : gpath -> (nat -> world) := fun gp =>  match gp with | existT a _ => a end.
 Coercion gpath_proj1 : gpath >-> Funclass.
 
 (* State satisfaction *)
-Definition forces (s : cstate S) (p : pred) : Prop :=
+Definition forces (s : world) (p : pred) : Prop :=
   p s.
 Notation "w '|=' P" := (forces w P) (at level 80, no associativity).
 
@@ -204,6 +227,8 @@ Notation "~~ P" := (Neg P) : temporal_logic.
 Notation "P & Q" := (Conj P Q) (at level 65, left associativity) : temporal_logic.
 Notation "P || Q" := (Disj P Q) : temporal_logic.
 Notation "P --> Q" := (Impl P Q) (at level 35, no associativity) : temporal_logic.
+Notation "'A' '[' P 'U' Q ']'" := (AllUntil P Q) (at level 35, no associativity) : temporal_logic.
+Notation "'E' '[' P 'U' Q ']'" := (ExistsUntil P Q) (at level 35, no associativity) : temporal_logic.
 
 (* Temporal operator extensions *)
 Definition AllRelease P Q : pred := 
@@ -214,6 +239,9 @@ Definition AllWait P Q : pred :=
   AllRelease P (P || Q).
 Definition ExistsWait P Q : pred :=
   ExistsRelease P (P || Q).
+
+Notation "'A' '[' P 'W' Q ']'" := (AllWait P Q) (at level 35, no associativity) : temporal_logic.
+Notation "'E' '[' P 'W' Q ']'" := (ExistsWait P Q) (at level 35, no associativity) : temporal_logic.
 
 End Semantics.
 
@@ -227,7 +255,7 @@ Notation "P --> Q" := (Impl P Q) (at level 35, no associativity) : temporal_logi
 
 (* Given the sigma-type gpath, we can safely say this
 because gpath will handle the proof of reachability *)
-Definition reachable (S : Type) (P : Protocol S) (st st' : cstate S) :=
+Definition reachable (S : Type) (P : Protocol S) (st st' : world S) :=
   exists (p : gpath P),
   exists (n m : nat),
     p n = st /\ p m = st.
