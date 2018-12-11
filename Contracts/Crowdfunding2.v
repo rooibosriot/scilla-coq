@@ -6,7 +6,7 @@ Require Import Eqdep.
 From Heaps
 Require Import pred prelude idynamic ordtype pcm finmap unionmap heap coding. 
 From Contracts
-Require Import Automata2. 
+Require Import Automata2 CTL.
   
 Set Implicit Arguments.
 Unset Strict Implicit.
