@@ -285,14 +285,14 @@ Program Definition crowd_prot : Protocol crowdState :=
 
 Lemma crowd_tags : tags crowd_prot = [:: 1; 2; 3].
 Proof. by []. Qed.
-
+(* 
 Lemma find_leq {A : eqType} (p : pred (A * nat)) (bs : seq (A * nat)) :
   nth 0 [seq i.2 | i <- bs] (seq.find p bs) <= sumn [seq i.2 | i <- bs].
 Proof.
 elim: bs=>//[[a w]]bs/=Gi; case:ifP=>_/=; first by rewrite leq_addr.
 by rewrite (leq_trans Gi (leq_addl w _)).
 Qed.
-
+*)
 
 (***********************************************************)
 (**             Correctness properties                    **)
@@ -319,7 +319,7 @@ Definition balance_backed (st: cstate crowdState) : Prop :=
   ~~ (funded (state st)) ->
   (* the contract has enough funds to reimburse everyone. *)
   sumn (map snd (backers (state st))) <= balance st.
-
+(* 
 Lemma sufficient_funds_safe : safe crowd_prot balance_backed.
 Proof.
 apply: safe_ind=>[|[id bal s]bc m M Hi]//.
@@ -544,5 +544,5 @@ SearchAbout sumn. (* How do I link the balance to the array contents? *)
 Focus 2.
 admit.
 Admitted.
-
+*)
 End Crowdfunding.

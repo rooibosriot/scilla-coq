@@ -1,0 +1,38 @@
+./Contracts/Crowdfunding.vo ./Contracts/Crowdfunding.glob ./Contracts/Crowdfunding.v.beautified: ./Contracts/Crowdfunding.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo ./Heaps/heap.vo ./Heaps/coding.vo ./Core/Automata2.vo
+./Contracts/Crowdfunding.vio: ./Contracts/Crowdfunding.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio ./Heaps/heap.vio ./Heaps/coding.vio ./Core/Automata2.vio
+./Contracts/Crowdfunding2.vo ./Contracts/Crowdfunding2.glob ./Contracts/Crowdfunding2.v.beautified: ./Contracts/Crowdfunding2.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo ./Heaps/heap.vo ./Heaps/coding.vo ./Core/Automata2.vo
+./Contracts/Crowdfunding2.vio: ./Contracts/Crowdfunding2.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio ./Heaps/heap.vio ./Heaps/coding.vio ./Core/Automata2.vio
+./Contracts/Puzzle.vo ./Contracts/Puzzle.glob ./Contracts/Puzzle.v.beautified: ./Contracts/Puzzle.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo ./Heaps/heap.vo ./Heaps/coding.vo ./Core/Automata.vo
+./Contracts/Puzzle.vio: ./Contracts/Puzzle.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio ./Heaps/heap.vio ./Heaps/coding.vio ./Core/Automata.vio
+./Core/Automata.vo ./Core/Automata.glob ./Core/Automata.v.beautified: ./Core/Automata.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo ./Heaps/heap.vo ./Heaps/coding.vo
+./Core/Automata.vio: ./Core/Automata.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio ./Heaps/heap.vio ./Heaps/coding.vio
+./Core/Automata2.vo ./Core/Automata2.glob ./Core/Automata2.v.beautified: ./Core/Automata2.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo ./Heaps/heap.vo ./Heaps/coding.vo
+./Core/Automata2.vio: ./Core/Automata2.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio ./Heaps/heap.vio ./Heaps/coding.vio
+./Core/Temporal.vo ./Core/Temporal.glob ./Core/Temporal.v.beautified: ./Core/Temporal.v ./Core/Automata2.vo
+./Core/Temporal.vio: ./Core/Temporal.v ./Core/Automata2.vio
+./Heaps/coding.vo ./Heaps/coding.glob ./Heaps/coding.v.beautified: ./Heaps/coding.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/domain.vo ./Heaps/pcm.vo ./Heaps/spcm.vo ./Heaps/unionmap.vo ./Heaps/heap.vo
+./Heaps/coding.vio: ./Heaps/coding.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/domain.vio ./Heaps/pcm.vio ./Heaps/spcm.vio ./Heaps/unionmap.vio ./Heaps/heap.vio
+./Heaps/domain.vo ./Heaps/domain.glob ./Heaps/domain.v.beautified: ./Heaps/domain.v ./Heaps/pred.vo ./Heaps/prelude.vo
+./Heaps/domain.vio: ./Heaps/domain.v ./Heaps/pred.vio ./Heaps/prelude.vio
+./Heaps/finmap.vo ./Heaps/finmap.glob ./Heaps/finmap.v.beautified: ./Heaps/finmap.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/ordtype.vo
+./Heaps/finmap.vio: ./Heaps/finmap.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/ordtype.vio
+./Heaps/heap.vo ./Heaps/heap.glob ./Heaps/heap.v.beautified: ./Heaps/heap.v ./Heaps/pred.vo ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/pcm.vo ./Heaps/finmap.vo ./Heaps/unionmap.vo
+./Heaps/heap.vio: ./Heaps/heap.v ./Heaps/pred.vio ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/pcm.vio ./Heaps/finmap.vio ./Heaps/unionmap.vio
+./Heaps/idynamic.vo ./Heaps/idynamic.glob ./Heaps/idynamic.v.beautified: ./Heaps/idynamic.v ./Heaps/prelude.vo
+./Heaps/idynamic.vio: ./Heaps/idynamic.v ./Heaps/prelude.vio
+./Heaps/ordtype.vo ./Heaps/ordtype.glob ./Heaps/ordtype.v.beautified: ./Heaps/ordtype.v
+./Heaps/ordtype.vio: ./Heaps/ordtype.v
+./Heaps/pcm.vo ./Heaps/pcm.glob ./Heaps/pcm.v.beautified: ./Heaps/pcm.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/ordtype.vo ./Heaps/finmap.vo
+./Heaps/pcm.vio: ./Heaps/pcm.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/ordtype.vio ./Heaps/finmap.vio
+./Heaps/pperm.vo ./Heaps/pperm.glob ./Heaps/pperm.v.beautified: ./Heaps/pperm.v ./Heaps/pred.vo
+./Heaps/pperm.vio: ./Heaps/pperm.v ./Heaps/pred.vio
+./Heaps/pred.vo ./Heaps/pred.glob ./Heaps/pred.v.beautified: ./Heaps/pred.v
+./Heaps/pred.vio: ./Heaps/pred.v
+./Heaps/prelude.vo ./Heaps/prelude.glob ./Heaps/prelude.v.beautified: ./Heaps/prelude.v ./Heaps/pred.vo
+./Heaps/prelude.vio: ./Heaps/prelude.v ./Heaps/pred.vio
+./Heaps/spcm.vo ./Heaps/spcm.glob ./Heaps/spcm.v.beautified: ./Heaps/spcm.v ./Heaps/pred.vo ./Heaps/prelude.vo ./Heaps/ordtype.vo ./Heaps/domain.vo ./Heaps/unionmap.vo ./Heaps/pcm.vo ./Heaps/heap.vo
+./Heaps/spcm.vio: ./Heaps/spcm.v ./Heaps/pred.vio ./Heaps/prelude.vio ./Heaps/ordtype.vio ./Heaps/domain.vio ./Heaps/unionmap.vio ./Heaps/pcm.vio ./Heaps/heap.vio
+./Heaps/unionmap.vo ./Heaps/unionmap.glob ./Heaps/unionmap.v.beautified: ./Heaps/unionmap.v ./Heaps/idynamic.vo ./Heaps/ordtype.vo ./Heaps/finmap.vo ./Heaps/pcm.vo
+./Heaps/unionmap.vio: ./Heaps/unionmap.v ./Heaps/idynamic.vio ./Heaps/ordtype.vio ./Heaps/finmap.vio ./Heaps/pcm.vio
+./Libs/bits.vo ./Libs/bits.glob ./Libs/bits.v.beautified: ./Libs/bits.v
+./Libs/bits.vio: ./Libs/bits.v

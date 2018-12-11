@@ -1,7 +1,10 @@
--Q Heaps Heaps
--Q Libs Contracts
--Q Core Contracts
--Q Contracts Contracts
+-R Heaps Heaps
+-R Libs Contracts
+-R Core Contracts
+-R Contracts Contracts
+-R ../mathcomp/ssreflect mathcomp.ssreflect
+-R ../VST/msl VST.msl
+-R ../ssl_coq SSL
 -arg "-w -notation-overridden,-local-declaration,-redundant-canonical-projection,-projection-no-head-constant"
 
 Heaps/coding.v

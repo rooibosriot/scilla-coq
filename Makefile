@@ -1,11 +1,25 @@
-default: Makefile.coq
-	make -f Makefile.coq
+COQC = coqc
+COQDEP = coqdep
 
-clean: Makefile.coq
-	make -f Makefile.coq clean
-	rm -f Makefile.coq
+COQ_FLAG = -Q "./Heaps" Heaps -Q "./Libs" Contracts -Q "./Core" Contracts -Q "./Contracts" Contracts -Q "../mathcomp/ssreflect" mathcomp.ssreflect -Q "../ssl_coq" SSL -Q "../VST/msl" VST.msl
 
-Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject > Makefile.coq
+SOURCE := $(shell find "." -type f -name '*.v')
+VO_FILE := $(shell find "." -type f -name '*.vo')
+GLOB_FILE := $(shell find "." -type f -name '*.glob')
+AUX_FILE := $(shell find "." -type f -name '*.vo.aux')
 
-.PHONY: default clean
+$(SOURCE:%.v=%.vo): %.vo: %.v
+	@echo COQC $*.v
+	@$(COQC) $(COQ_FLAG) $*.v
+
+dep:
+	@$(COQDEP) $(COQ_FLAG) $(SOURCE) > .depend
+
+all: $(SOURCE:%.v=%.vo)
+
+clean:
+	@rm $(VO_FILE) $(GLOB_FILE) $(AUX_FILE)
+
+.DEFAULT_GOAL := all
+
+include .depend
