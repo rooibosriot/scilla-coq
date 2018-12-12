@@ -1,4 +1,4 @@
-From VST.msl
+From VST
 Require Import seplog Extensionality.
 From Contracts
 Require Import Automata2.

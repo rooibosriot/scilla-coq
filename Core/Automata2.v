@@ -1,6 +1,6 @@
 From mathcomp.ssreflect
 Require Import ssreflect ssrnat ssrfun ssrbool eqtype seq. 
-From VST.msl
+From VST
 Require Import seplog Extensionality.
 Set Implicit Arguments.
 Unset Strict Implicit.

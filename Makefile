@@ -1,7 +1,7 @@
 COQC = coqc
 COQDEP = coqdep
 
-COQ_FLAG = -Q "./Heaps" Heaps -Q "./Libs" Contracts -Q "./Core" Contracts -Q "./Contracts" Contracts -Q "../mathcomp/ssreflect" mathcomp.ssreflect -Q "../ssl_coq" SSL -Q "../VST/msl" VST.msl
+COQ_FLAG = -Q "./VST" VST -Q "./Heaps" Heaps -Q "./Libs" Contracts -Q "./Core" Contracts -Q "./Contracts" Contracts -Q "../mathcomp/ssreflect" mathcomp.ssreflect -Q "../ssl_coq" SSL
 
 SOURCE := $(shell find "." -type f -name '*.v')
 VO_FILE := $(shell find "." -type f -name '*.vo')

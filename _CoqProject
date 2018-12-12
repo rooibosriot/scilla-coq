@@ -1,12 +1,15 @@
+-R VST VST
 -R Heaps Heaps
 -R Libs Contracts
 -R Core Contracts
 -R Contracts Contracts
 -R ../mathcomp/ssreflect mathcomp.ssreflect
--R ../VST/msl VST.msl
 -R ../ssl_coq SSL
 -arg "-w -notation-overridden,-local-declaration,-redundant-canonical-projection,-projection-no-head-constant"
 
+VST/Axioms.v
+VST/Extensionality.v
+VST/seplog.v
 Heaps/coding.v
 Heaps/domain.v
 Heaps/finmap.v
