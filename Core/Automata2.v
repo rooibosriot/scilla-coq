@@ -209,3 +209,27 @@ End Crowdfunding.
 
 End Protocol.
 
+
+Record world T := mkW
+    {
+      inFlight : message;
+      st : cstate T;
+      b : bstate;
+      outFlight : option message
+    }. 
+
+
+Parameter emptymsg: message.
+Parameter b0 : bstate.
+Definition world0 (T : Type) (prot : Protocol T) := mkW emptymsg (state0 prot) b0 None.
+Definition step_world (T : Type) (prot : Protocol T) (w : world T) : world T :=
+     let: CState id bal s := st w in
+     let: bc := b w in
+     let: m := inFlight w in
+     let: n := seq.find (fun t => ttag t == method m) (transitions prot) in
+     let: tr := nth (idle T) (transitions prot) n in
+     let: (s', out) := (tfun tr) id bal s m bc in
+     let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
+     mkW m (CState id bal' s') bc out.
+  
+

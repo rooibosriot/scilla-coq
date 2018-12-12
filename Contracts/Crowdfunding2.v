@@ -54,9 +54,11 @@ Definition init_state := CS (init_owner, init_max_block, init_goal) [::] false.
 funds, the contract will have enough funds to reimburse every backer.
  ************************************************************************)
 (* Important reminder: supply pred S with crowdState and not world crowdState *)
-
+Variable T : Type.
+Variable w : Automata2.world T.
+Locate world.
 Definition notfunded_pred : pred crowdState :=
-  fun w => funded (state (st w)) = false.
+  fun (w : world crowdState) => funded (state (st w)) = false.
 Definition balance_sufficient_pred : pred crowdState :=
   fun s => sumn (map snd (backers (state (st s)))) <= balance (st s).
 (*

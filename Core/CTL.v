@@ -1,9 +1,8 @@
-From mathcomp.ssreflect
-Require Import ssreflect ssrnat ssrfun ssrbool eqtype seq. 
 From VST.msl
 Require Import seplog Extensionality.
 From Contracts
 Require Import Automata2.
+Require Import Omega Arith Bool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -16,34 +15,13 @@ Tactic Notation "spec" hyp(H) constr(a) :=
 Tactic Notation "spec" hyp(H) constr(a) constr(b) :=
   (generalize (H a b); clear H; intro H).
 
-
+(* Implementation of non-specific world  *) 
 Section World.
 (* World type *)
   Variables (T : Type) (prot : Protocol T).
+  Parameter step_world : world T -> world T.
+  Parameter world0 : world T.
 
-  (* In order to transition to Kripke models, we augment world with 
-     predetermined outFlight message, similar to FSM in NuSMV *)
-  Record world T := mkW
-      {
-        inFlight : message;
-        st : cstate T;
-        b : bstate;
-        outFlight : option message
-      }.
-
-    Parameter emptymsg: message.
-    Parameter b0 : bstate.
-    Definition world0 := mkW emptymsg (state0 prot) b0 None. (* First world *)
-    Definition step_world (w : world T) : world T :=
-     let: CState id bal s := st w in
-     let: bc := b w in
-     let: m := inFlight w in
-     let: n := seq.find (fun t => ttag t == method m) (transitions prot) in
-     let: tr := nth (idle T) (transitions prot) n in
-     let: (s', out) := (tfun tr) id bal s m bc in
-     let: bal' := if out is Some m' then (bal + val m) - val m' else bal in
-     mkW m (CState id bal' s') bc out.
-  
     Definition pred := world T -> Prop.
   
     Definition reachability : world T -> world T -> Prop :=
@@ -57,8 +35,7 @@ Section World.
     (* Path definitions *)
     Definition path := nat -> world T.
     Definition first (p : path) : world T := p 0.
-    Definition path_predicate (p : path) := forall n, reachability (p n) (p (n.+1)).
-    (** Contention : paths can't all start with world0 **) 
+    Definition path_predicate (p : path) := forall n, reachability (p n) (p (S n)).
     (* Good path sigma-type definitions *)
     Definition gpath : Type := {p : path & path_predicate p}.
     (* Projection functions for sigma type good paths *)
@@ -84,7 +61,7 @@ Section World.
 
     Lemma rewrite_step_world_S :
       forall (n : nat) (w : world T),
-        step_n_times w (n.+1) = step_world (step_n_times w n).
+        step_n_times w (S n) = step_world (step_n_times w n).
       Proof. reflexivity. Qed.
 
     Lemma step_world_swap_helper :
@@ -114,7 +91,7 @@ Section World.
     
     Lemma step_world_ind :
       forall n : nat,
-        step_world (step_n_times world0 n) = step_n_times world0 n.+1.
+        step_world (step_n_times world0 n) = step_n_times world0 (S n).
     Proof.
       induction n.
       - simpl; reflexivity.
@@ -153,8 +130,8 @@ Section World.
     (* The answer is yes *)
 
     (* Constructing an offset path *)
-    Definition make_offset_path (p : path) : path := fun n => p n.+1.
-    Definition make_offset_path' (gp : gpath) : path := fun n => gpath_proj1 gp n.+1.
+    Definition make_offset_path (p : path) : path := fun n => p (S n).
+    Definition make_offset_path' (gp : gpath) : path := fun n => gpath_proj1 gp (S n).
     Lemma about_offset_path :
       forall p : path,
         path_predicate p ->
@@ -164,7 +141,7 @@ Section World.
       unfold make_offset_path.
       unfold path_predicate in *.
       intro n. 
-      exact (H_p n.+1).
+      exact (H_p (S n)).
     Qed.
     Lemma about_offset_path' :
       forall gp : gpath,
@@ -176,7 +153,7 @@ Section World.
       unfold gpath_proj1.
       unfold path_predicate.
       intros n.
-      exact (p n.+1).
+      exact (p (S n)).
     Qed.
     Definition gp_offset (p : path) (pred : path_predicate p) : gpath :=
       (existT _ (make_offset_path p) (about_offset_path pred)).
@@ -185,9 +162,9 @@ Section World.
 
     (* Constructing a backwards offset path *)
     Definition make_backwards_offset_path (w0 : world T) (p : path) : path :=
-      fun n => if eqn n 0 then w0 else (p n.-1).
+      fun n => match n with 0 => w0 | _ => (p (n-1)) end.
     Definition make_backwards_offset_path' (w0 : world T) (gp : gpath) : path :=
-      fun n => if eqn n 0 then w0 else gpath_proj1 gp n.-1.
+      fun n => match n with 0 => w0 | _ => (gpath_proj1 gp (n-1)) end.
     Lemma about_backwards_offset_path :
       forall (p : path) (w0 : world T),
         path_predicate p ->
@@ -199,7 +176,7 @@ Section World.
       unfold path_predicate in *.
       destruct n.
       simpl. exact H.
-      simpl. apply (H_p n).
+      simpl. replace (n-0) with n. Focus 2. omega. apply (H_p n).
     Qed.
     Lemma about_backwards_offset_path' :
       forall (gp : gpath) (w0 : world T),
@@ -213,7 +190,7 @@ Section World.
       unfold path_predicate.
       destruct n.
       simpl. exact H_0.
-      simpl. apply (p n).
+      simpl. replace (n-0) with n. Focus 2. omega. apply (p n).
     Qed.
     Definition gp_backwards_offset
                (w0 : world T) (p : path)
@@ -238,7 +215,8 @@ Axiom LEM : forall P : Prop, P \/ ~ P.
 Notation "w '|=' p" := (satisfies w p) (at level 80, no associativity).
 
 Section CTL.
-  Variables (S : Type) (prot : Protocol S).  
+
+Variables (T : Type) (prot : Protocol T).  
 Local Open Scope logic.
 
 (* NatDed in Prop  *) 
@@ -269,7 +247,7 @@ Instance natded_prop : NatDed Prop :=
 - intros. apply H. exact H0. trivial. 
 - intros. exact H.
 - intros. apply H; exact H0.
-- intros. exact (H b1).
+- intros. exact (H b).
 Defined.
 
 (* NatDed in pred *)
@@ -341,65 +319,65 @@ Class CTL (T : Type) {ND: NatDed T} : Type := mkCTL {
                                                               --> FF) && all_future Q; 
                                                 }.
 
-Instance lift_ctl_modal : (@CTL _ (natded_pred S)) :=
+Instance lift_ctl_modal : (@CTL _ (natded_pred T)) :=
   { all_next p := fun w =>
-                    forall gp : gpath prot,
+                    forall gp : gpath T,
                       first gp = w -> gp 1 |= p;
     exists_next p := fun w =>
-                       exists gp : gpath prot,
+                       exists gp : gpath T,
                          first gp = w /\ gp 1 |= p;
     all_future p := fun w =>
-                      forall gp : gpath prot,
+                      forall gp : gpath T,
                         first gp = w -> exists n, gp n |= p;
     exists_future p := fun w =>
-                         forall gp : gpath prot,
+                         forall gp : gpath T,
                            first gp = w -> exists n, gp n |= p;
     all_box p := fun w =>
-                   forall gp : gpath prot,
+                   forall gp : gpath T,
                      first gp = w -> forall n, gp n |= p;
     exists_box p := fun w =>
-                      exists gp : gpath prot,
+                      exists gp : gpath T,
                         first gp = w /\ forall n, gp n |= p;
     all_until p q := fun w =>
-                       forall gp : gpath prot,
+                       forall gp : gpath T,
                          first gp = w ->
                          exists n, gp n |= q
                                    /\ forall m, m < n -> gp m |= p;
     exists_until p q := fun w =>
-                          exists gp : gpath prot,
+                          exists gp : gpath T,
                             first gp = w
                             /\ exists n, gp n |= q
                                          /\ forall m, m < n -> gp m |= p;
   }.
-(* Proving ctl_1 : forall (P : T), all_box P |-- (P && all_next (all_box P)) *)
+(* Proving ctl_1 : forall (P : T), all_box P |-- (P && all_next (all_box P)) *) 
 intros P.
 unfold derives. simpl. unfold satisfies in *. 
 intros w H_AG.
 split.
-spec H_AG (gp_hole prot w).
+spec H_AG (gp_hole w).
 unfold first in H_AG.
-assert ((gp_hole prot w) 0 = w).
+assert ((gp_hole w) 0 = w).
 simpl. reflexivity.
 exact (H_AG H 0).
 intros gp H_first gp' H_first' n.
-assert (exists m, gp m = gp' n).
-exists n.+1.
+assert (exists m, gp m = gp' n). 
+exists (S n).
 unfold gpath in gp, gp'.
-destruct gp, gp'.
-unfold path_predicate in p, p0.
+destruct gp as [pth1 about_pth1]; destruct gp' as [pth2 about_pth2].
+unfold path_predicate in about_pth1, about_pth2.
 simpl in H_first'.
 unfold first in H_first'.
 simpl in H_first, H_first'. simpl.
-assert (p_copy := p).
-assert (p0_copy := p0).
-unfold reachability in p, p0.
+assert (pth1_copy := pth1).
+assert (pth2_copy := pth2).
+unfold reachability in pth1, pth2.
 induction n.
 symmetry; exact H_first'.
-rewrite <- (p n.+1).
-rewrite <- (p0 n). rewrite <- IHn. 
+rewrite <- (about_pth1 (S n)).
+rewrite <- (about_pth2 n). rewrite <- IHn. 
 reflexivity.
-destruct H.
-rewrite <- H. 
+destruct H as [m pth_relation].
+rewrite <- pth_relation. 
 spec H_AG gp.
 apply H_AG. exact H_first.
 (* Proving ctl_2 : forall (P : T), (P && all_next (all_box P)) |-- all_box P *)
@@ -410,7 +388,7 @@ destruct H as [H_P H_AXAG].
 spec H_AXAG gp.
 (* The following series of bookkeeping moves is annoying but necessary to 
 circumvent the high demands of automation from apply tactic *)
-assert (forall gp' : gpath prot, first gp' = gp 1 -> forall n : nat, P (gp' n)).
+assert (forall gp' : gpath T, first gp' = gp 1 -> forall n : nat, P (gp' n)).
 apply H_AXAG; exact H_first.
 clear H_AXAG.
 rename H into H_AXAG.
@@ -432,81 +410,78 @@ intros P.
 unfold derives. simpl. unfold satisfies in *. 
 intros w H_EG.
 split.
-destruct H_EG. destruct H. 
-spec H0 0.
-unfold first in H; rewrite H in H0; exact H0.
-destruct H_EG. destruct H.
-exists x. split.
-exact H. exists (gp_offset' x).
+destruct H_EG as [gpth [H_first H_EG]]. 
+spec H_EG 0.
+unfold first in H_first; rewrite H_first in H_EG; exact H_EG.
+destruct H_EG as [gpth [H_first H_EG]].
+exists gpth. split.
+exact H_first. exists (gp_offset' gpth).
 split.
 simpl. unfold make_offset_path'. unfold first. reflexivity.
 intro n.
-spec H0 n.+1.
+spec H_EG (S n).
 unfold gp_offset'.
 unfold make_offset_path'. simpl.
-exact H0.
+exact H_EG.
 (* Proving ctl_4 : forall (P : T), (P && (exists_next (exists_box P))) |-- exists_box P *)
 intro P.
 unfold derives. simpl. unfold satisfies in *.
-intros. destruct H.
-repeat destruct H0.
-destruct H1. destruct H0.
-assert (reachability prot (x 0) (x 1)).
-unfold gpath in x. 
-destruct x.
-unfold path_predicate in p.
+intros.
+destruct H as [H_P [gpth [H_first [gpth' [H_first' H_P']]]]].
+assert (reachability (gpth 0) (gpth 1)).
+unfold gpath in gpth. 
+destruct gpth as [gpth about_gpth].
+unfold path_predicate in about_gpth.
 simpl.
-exact (p 0).
-assert (reachability prot (x 0) (x0 0)).
-unfold first in H0; rewrite H0; exact H2.
-clear H2.
-exists (gp_backwards_offset' H3).
-split.
-simpl. unfold make_backwards_offset_path'.
-unfold first. reflexivity.
-unfold gp_backwards_offset'.
-destruct n.
-simpl. exact H.
-simpl.
-unfold make_backwards_offset_path'.
-simpl. exact (H1 n).
+exact (about_gpth 0).
+assert (reachability (gpth 0) (gpth' 0)).
+unfold first in H_first'; rewrite H_first'; exact H.
+exists (gp_backwards_offset' H0).
+split; simpl; unfold make_backwards_offset_path'; unfold first in *;
+  unfold gp_backwards_offset'; simpl.
+exact H_first.
+intro n; simpl.
+case n. 
+simpl; rewrite H_first; exact H_P.
+intro n'; simpl.
+replace (n'-0) with n' by omega. exact (H_P' n'). 
 (* Proving equiv_1 : AX P == ~ EX (~P) *)
 intro P.
 unfold derives. simpl. unfold satisfies in *.
 intros w H_1 H.
-repeat destruct H.
-spec H_1 x.
-assert (first x = first x) by reflexivity.
+destruct H as [gpth [H_first H_not1]].
+spec H_1 gpth.
+assert (first gpth = first gpth) by reflexivity.
+rewrite <- H_first in H_1.
 apply H_1 in H.
-apply H0.
+apply H_not1.
 exact H.
 (* Proving equiv_2 : AF P == ~ EG (~P) *)
 intro P. 
 unfold derives. simpl. unfold satisfies in *.
 intros w H_AG H_EG.
-destruct H_EG.
-destruct H.
-spec H_AG x.
-apply H_AG in H.
-destruct H.
-spec H0 x0.
-apply H0. exact H.
+destruct H_EG as [gpth [H_first H_notP]].
+spec H_AG gpth.
+apply H_AG in H_first.
+destruct H_first as [n H_P].
+spec H_notP n.
+apply H_notP. exact H_P.
 (* Proving equiv_3 : AG p == ~ EF (~P) *)
 intro P. 
 unfold derives. simpl. unfold satisfies in *.
 intros w H_AG H_EF.
-spec H_AG (gp_hole prot w).
-assert (first (gp_hole prot w) = w).
+spec H_AG (gp_hole w).
+assert (first (gp_hole w) = w).
 unfold first. unfold gp_hole. simpl; reflexivity.
-assert (forall n : nat, P ((gp_hole prot w) n)).
+assert (forall n : nat, P ((gp_hole w) n)).
 apply H_AG. exact H.
 clear H_AG.
-spec H_EF (gp_hole prot w).
-assert (exists n : nat, P ((gp_hole prot w) n) -> False).
+spec H_EF (gp_hole w).
+assert (exists n : nat, P ((gp_hole w) n) -> False).
 apply H_EF; exact H.
-destruct H1.
-apply H1.
-spec H0 x. exact H0.
+destruct H1 as [n H_notP].
+apply H_notP.
+spec H0 n. exact H0.
 (* Proving equiv_4 : AF P == A[T U P] *)
 intro P. 
 unfold derives. simpl. unfold satisfies in *.
@@ -521,42 +496,61 @@ intros. reflexivity.
 intro P.
 unfold derives. simpl. unfold satisfies in *.
 intros w H_EF.
-spec H_EF (gp_hole prot w).
-assert (first (gp_hole prot w) = w) by reflexivity.
+spec H_EF (gp_hole w).
+assert (first (gp_hole w) = w) by reflexivity.
 apply H_EF in H.
 clear H_EF.
-destruct H. 
-exists (gp_hole prot w).
+destruct H as [n H].
+exists (gp_hole w).
 split.
 reflexivity.
-exists x. 
+exists n. 
 split.
 exact H.
 intros; reflexivity.
 (* Proving equiv_6 : A[P U Q] == ~E[~P U (~P /\ ~Q)] /\ (AF Q) *)
 intros P Q. 
-unfold derives. simpl. unfold satisfies in *.
+unfold derives. simpl. unfold satisfies in *. 
 intros w H_AU.
 split.
 intros H_EU.
-destruct H_EU.
-repeat destruct H.
-destruct H0. repeat destruct H.
-spec H_AU x.
-assert (first x = first x) by reflexivity. 
-apply H_AU in H.
+destruct H_EU as [gpth [H_first [n [[H_EU_right_P H_EU_right_Q] H_left]]]].
+spec H_AU gpth.
+apply H_AU in H_first.
 clear H_AU.
-(* Clearly this needs to be proven via contradiction *)
-rename H into H_EU. rename x into gp.
-destruct H_EU.
-destruct H.
-assert (x < x0 \/ ~ x < x0).
-apply LEM.
-destruct H3.
-spec H0 x. 
-apply H0 in H3.
-inversion H3.
-Abort.
+destruct H_first as [m [H_Qm H_P_before_m]]. 
+(* Case distinction on the relationship between n and m *)
+assert (n < m \/ ~ n < m). apply LEM.
+destruct H as [n_before_m | n_after_m].
+- spec H_P_before_m n.
+  apply H_P_before_m in n_before_m.
+  contradiction.
+  (* Here we get mired in an uncomfortable liminal area
+     between regular Coq and ssreflect Coq *)  
+- SearchAbout (~ _ < _ -> _).
+  apply not_lt in n_after_m.
+  assert (m <= n) by omega.
+  SearchAbout (_ <= _ ->  _ \/ _).
+  apply le_lt_or_eq in H.
+  clear n_after_m.
+  destruct H as [m_before_n | m_eq_n].
+  * assert (P (gpth m) \/ ~ P (gpth m)).
+    apply LEM.
+    destruct H as [yes | no].
+    apply (H_left m) in m_before_n.
+    exact m_before_n. exact yes.
+  (* I somehow don't believe that this is provable. *)
+    apply (H_left 0).
+    SearchAbout (0 < _).
+    apply Nat.lt_lt_0 in m_before_n.
+    exact m_before_n.
+    apply (H_P_before_m 0).
+    assert (m = 0 \/ ~ m = 0).
+    apply LEM.  
+    destruct H as [m_zero | m_nonzero]. 
+    (* Still don't think this is provable *)
+    admit.
+Admitted.
 
 End CTL.
 
