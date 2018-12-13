@@ -1,22 +1,18 @@
-From VST
-Require Import seplog Extensionality.
+From mathcomp.ssreflect
+Require Import ssreflect ssrbool ssrnat eqtype.
+Require Import Eqdep.
 From Contracts
 Require Import Automata2.
-Require Import Omega Arith Bool.
 
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
+(* Tacticals *)
+Ltac impl_e P P_implies_Q :=
+  apply P_implies_Q in P.
 Tactic Notation "spec" hyp(H) :=
   match type of H with ?a -> _ => 
     let H1 := fresh in (assert (H1: a); [|generalize (H H1); clear H H1; intro H]) end.
 Tactic Notation "spec" hyp(H) constr(a) :=
   (generalize (H a); clear H; intro H). 
-Tactic Notation "spec" hyp(H) constr(a) constr(b) :=
-  (generalize (H a b); clear H; intro H).
 
-(* Implementation of non-specific world  *) 
 Section World.
 (* World type *)
   Variables (T : Type) (prot : Protocol T).
@@ -556,3 +552,384 @@ Admitted.
 End CTL.
 
 (* Next: induction principle for CTL? Proof theory? *) 
+
+
+Parameter Top : pred.
+Parameter Bottom : pred.
+Axiom about_top : forall w, Top w.
+Axiom about_bottom : forall w, Bottom w -> False.
+ (* Satisfaction definition *)
+  Definition satisfies (w : state) (p : pred) : Prop := p w.
+  
+  (* I'm not sure that the following metalogic entail is necessary *)
+  Definition entails (p q : pred)  : Prop := forall w,  (satisfies w p) -> (satisfies w q).
+  Definition equiv (p q : pred) : Prop := entails p q /\ entails q p.
+Notation "w '|=' p" := (satisfies w p) (at level 80, no associativity).
+Definition Neg p : pred := fun w => (w |= p) -> False.
+Definition Conj p q : pred := fun w => (w |= p) /\ (w |= q).
+Definition Disj p q : pred := fun w => (w |= p) \/ (w |= q).
+Definition Impl p q : pred := fun w => ~ (w |= p) \/ (w |= q).
+
+(* Temporal operator definitions *)
+(* AX says 'in every next state', all gpaths beginning with w next satisfy p. *)
+Definition AllNext (p : pred) := fun w =>  
+  forall gp : path, first gp = w -> gp 1 |= p.
+(* EX says 'in some next state', all gpaths beginning with w next satisfy p. *)
+Definition ExistsNext (p : pred) := fun w =>  
+  exists gp : path, first gp = w /\ gp 1 |= p.
+(* AG says all states along all paths beginning with  w satisfy p, including w. *)
+Definition AllBox (p : pred) := fun w =>  
+  forall gp : path, first gp = w -> forall n, gp n |= p.
+(* EG says that there exists a path beginning with w along which all states satisfy p. *)
+Definition ExistsBox (p : pred) := fun w =>  
+  exists gp : path, first gp = w /\ forall n, gp n |= p.
+(* AF says all paths beginning with w contain a future state which satisfies p. *)
+Definition AllFuture (p : pred) := fun w =>  
+  forall gp : path, first gp = w -> exists n, gp n |= p.
+(* EF says that there exists a path beginning with a future state which satisfies p. *)
+Definition ExistsFuture (p : pred) := fun w =>  
+  exists gp : path, first gp = w /\  exists n, gp n |= p.
+(* AU says that all paths beginning with w satisfy p Until q. *)
+Definition AllUntil (p q : pred) := fun w =>  
+                                      forall gp : path, first gp = w -> exists n, gp n |= q /\ forall m, m < n -> gp m |= p.
+(* EU says that there exists a path beginning with w that satifies p Until q. *)
+Definition ExistsUntil (p q : pred) := fun w =>  
+  exists gp : path, first gp = w /\ exists n, gp n |= q /\ forall m, m < n -> gp m |= p.
+
+(* Extended temporal operator definitions *)
+Definition AllRelease (p q : pred) := fun w => 
+  Neg (ExistsUntil (Neg p) (Neg q)) w.
+Definition ExistsRelease (p q : pred) := fun w => 
+  Neg (AllUntil (Neg p) (Neg q)) w.
+Definition AllWait (p q : pred) := fun w => 
+  AllRelease q (Disj p q) w.
+Definition ExistsWait (p q : pred) := fun w =>
+  ExistsRelease q (Disj p q) w.
+
+(* Notation definitions *)
+Notation "p <=> q" := (equiv p q) (at level 35, no associativity).
+Notation "~~ p" := (Neg p).
+Notation "p && q" := (Conj p q) (at level 40, left associativity).
+Notation "p || q" := (Disj p q).
+Notation "p --> q" := (Impl p q) (at level 35, no associativity).
+Notation "'A' '[' p 'U' q ']'" := (AllUntil p q) (at level 35, no associativity).
+Notation "'E' '[' p 'U' q ']'" := (ExistsUntil p q) (at level 35, no associativity).
+Notation "'A' '[' p 'R' q ']'" := (AllRelease p q) (at level 35, no associativity).
+Notation "'E' '[' p 'R' q ']'" := (ExistsRelease p q) (at level 35, no associativity).
+Notation "'A' '[' p 'W' q ']'" := (AllWait p q) (at level 35, no associativity).
+Notation "'E' '[' p 'W' q ']'" := (ExistsWait p q) (at level 35, no associativity).
+
+(* Other fun equivalences to prove *)
+Section FunProofs.
+  Variables P Q : pred.
+
+  Parameter offset_path : path -> path.
+
+  Proposition fun1 : (AllBox P) <=> (P && (AllNext (AllBox P))).
+  Proof.
+    unfold equiv.
+    split.
+    Focus 1. (* left direction *)
+    unfold entails. 
+    intro s.
+    unfold satisfies.
+    intro H_AG.
+    unfold Conj.
+    unfold satisfies.
+    unfold AllBox in H_AG.  
+    split.
+    - spec H_AG (fun n : nat => s).
+      (* witness path starts at s. 
+         this is all we know about it *)
+      (* but we need to know more about it *)
+      unfold first in H_AG.
+      unfold satisfies in H_AG.
+      assert (s = s).
+      reflexivity.
+      impl_e H H_AG. exact H. admit. (* extra nat *)
+    - unfold AllNext, AllBox.
+      intro p.
+      intro H_first.
+      unfold satisfies.
+      intro next_path.
+      intro H_next_first.
+      spec H_AG p.
+      intro n.
+      assert (forall n, p (n + 1) = next_path n).
+      induction n0. unfold first in H_first.
+        unfold first in H_next_first.
+        rewrite H_next_first.  
+        reflexivity. admit. 
+      rewrite <- H.  
+      apply H_AG.
+      exact H_first.
+      (* right direction *)
+      unfold entails.
+      intro state.
+      unfold Conj.
+      intro H_AN.
+      unfold satisfies in *.
+      destruct H_AN as [H_P H_AN].
+      unfold AllBox.
+      intros pth H_first n.
+      unfold satisfies.
+      unfold AllNext, AllBox in H_AN.
+      unfold satisfies in H_AN.
+      spec H_AN (offset_path pth).
+      assert (forall n, pth (n - 1) = (offset_path pth) n).
+      admit.
+      apply H_AN.
+      spec H 0.
+      compute in H.
+      unfold first in H_first; rewrite H_first in H.
+      rewrite H.
+      reflexivity.
+      rewrite H_first.
+      spec H 1. compute in H.
+      rewrite <- H. rewrite <- H_first.
+      reflexivity.
+Admitted.
+
+  Proposition fun2 : (ExistsBox P) <=> (P && (ExistsNext (ExistsBox P))).
+  Proof.
+    unfold equiv.
+    split.
+    Focus 1. (* left direction *)
+    unfold entails. 
+    intro s.
+    unfold satisfies.
+    intro H_EG.
+    unfold Conj.
+    unfold satisfies.
+    unfold ExistsBox in H_EG.  
+    split.
+    destruct H_EG. (* instead of supplying witness ourselves *)
+    (* now we have a path, yay! *)
+    destruct H as [H_first H_P].
+    spec H_P 0.
+    unfold satisfies in H_P.
+    unfold first in H_first; rewrite H_first in H_P.
+    exact H_P.
+    destruct H_EG. (* readymade path again! *)
+    destruct H as [H_first H_P].
+    unfold ExistsNext, ExistsBox.
+    (* now we have to supply witness again *)
+    (* luckily, just x is fine *)
+    exists x.
+    split.
+    exact H_first.
+    unfold satisfies.
+    exists (offset_path x).
+    assert (forall n, x (n + 1) = (offset_path x) n).
+    admit.
+    split.
+    spec H 0.
+    compute in H. rewrite H. reflexivity.
+    intro n.
+    rewrite <- H.
+    apply H_P.
+    (* right direction *)
+    unfold entails, Conj.
+    intro s.
+    unfold satisfies.
+    intro H.
+    destruct H as [H_P H_EN].
+    unfold ExistsNext in H_EN.
+    destruct H_EN.
+    destruct H as [H_first H_EG].
+    unfold ExistsBox.
+    unfold satisfies in H_EG.
+    destruct H_EG.
+    (* x0 is the path that begins one state after x *)
+    destruct H.
+    (* again, just path x is sufficient as witness *)
+    exists x.
+    split. exact H_first.
+    (* actually, I'm not sure that this is provable...*)
+Admitted.
+
+
+  Proposition fun3 : (AllFuture P) <=> (P || (AllNext (AllFuture P))).
+  Proof.
+    unfold equiv.
+    split.
+    Focus 1.
+    (* left direction *)
+    unfold entails; unfold Disj.
+    intros s H_AF.
+    unfold satisfies.
+    unfold AllFuture in H_AF.
+    unfold satisfies in H_AF.
+    left.
+    spec H_AF (fun n:nat => s). (* again, need to be more expressive *)
+    compute in H_AF.
+    assert (s = s) by reflexivity.
+    assert (exists _ : nat, P s).
+    apply H_AF. exact H.
+    destruct H0. exact H0.
+    (* right direction *)
+    unfold entails; unfold Disj.
+    intros s H_AN.
+    unfold satisfies in *.
+    unfold AllFuture.
+    intros pth H_first.
+    destruct H_AN.
+    exists 0.
+    unfold first in H_first; rewrite H_first; exact H.
+    unfold AllNext, AllFuture in H.
+    unfold satisfies in H.
+    spec H pth.
+  Abort.
+
+  Proposition fun4 : (ExistsFuture P) <=> (P || (ExistsNext (ExistsFuture P))).
+  Proof. Abort.
+
+  Proposition fun5 : (AllUntil P Q) <=> (Q || (P && (AllNext (AllUntil P Q)))).
+  Proof. Abort.
+
+  Proposition fun6 : (ExistsUntil P Q) <=> (Q || (P && (ExistsNext (ExistsUntil P Q)))).
+  Proof. Abort. 
+
+End FunProofs.
+(* 
+Section deMorgan.
+
+  Variables P Q : pred.
+
+  Proposition deMorgan1 : (~~ (AllFuture P)) <=> (ExistsBox (~~ P)).
+  Proof. Abort.
+
+  Proposition deMorgan2 : (~~ (ExistsFuture P))<=> (AllBox (~~ P)).
+  Proof. Abort.
+
+  Proposition deMorgan3 : (~~ (AllNext P)) <=> (ExistsNext (~~ P)).
+  Proof. Abort.
+
+End deMorgan.
+
+Section OtherEquivalences.
+  Variables P Q : pred.
+
+  Proposition equiv1 : (AllFuture P) <=> (AllUntil Top P).
+  Proof. Abort.
+
+  Proposition equiv2 : (ExistsFuture P) <=> (ExistsUntil Top P).
+  Proof. Abort.
+
+End OtherEquivalences.
+*)
+(* I forgot exactly what this weird equivalence was 
+Proposition weirdequiv : forall P Q : Prop,
+    equiv (AllUntil P Q) (Neg ((ExistsUntil (Neg P) (Conj (Neg P) Disj (Neg Q))) ExistsBox (Neg Q)).
+Proof.
+  intros P Q.
+  split.
+  - intro H.
+    unfold AllUntil in H.
+    (* What in the world happens next *)
+Abort. *)
+
+
+(* Investigations 
+Definition AllWaits P Q : pred := fun w => 
+  forall p, first p = w ->
+            (forall n, p n |= P) \/
+                      (exists n, p n |= Q /\
+                                forall m, m < n -> p m |= P).
+
+Definition Option1 P Q : pred :=
+  AllBox P \_/ AllUntil P Q.
+
+Definition Option2 P Q : pred :=
+  ExistsBox P \_/ AllUntil P Q.
+
+Section Exploration.
+Variables P Q : pred.
+
+Lemma hypothesis1 : AllWaits P Q -=- Option1 P Q.
+Proof.
+  unfold AllWaits. 
+  unfold Option1.
+  unfold equiv.
+  split.
+  left. unfold AllBox.
+  intros p fst n.
+Abort.
+
+Lemma hypothesis2 : Option1 P Q -=- AllWaits P Q.
+Proof.
+  unfold equiv. split.
+  intro H; unfold Option1 in H. unfold AllWaits. intros p fst.
+  unfold AllBox in H.
+  (*
+  destruct H. left.
+  spec H p.
+  apply H.
+  exact fst.
+  unfold AllUntil in H.
+  spec H p.
+  right.
+  apply H. exact fst.
+Qed. *)
+  Abort.
+
+Lemma LEM_injection : forall P w, (exists p, first p = w -> forall n, p n |= P) \/
+                                  ~ (exists p, first p = w -> forall n, p n |= P).
+Proof.
+  intros.
+  apply LEM.
+Qed.
+
+Lemma hypothesis3 : AllWaits P Q -=- Option2 P Q.
+  Proof.
+    unfold equiv. split.
+    intro H_AllWaits; unfold AllWaits in H_AllWaits.
+    unfold Option2. (* 
+    assert ((exists p, first p = w -> forall n, p n |= P) \/
+            ~ (exists p, first p = w -> forall n, p n |= P)).
+    apply LEM.
+    destruct H as [H_left | H_right].
+    left.
+    unfold ExistsBox. exact H_left.
+    right; unfold AllUntil.
+    intros p fst.
+    spec H_AllWaits p.
+    apply H_AllWaits in fst.
+    destruct fst.
+    Focus 2.
+    exact H.  
+    assert (forall p, first p = w /\ exists n, p n |= P -> False).
+    admit. (* Let me deMorgan this away please *)
+    rename H0 into sacrilege.
+    spec sacrilege p.
+    destruct sacrilege as [fst sacriligious].
+    destruct sacriligious.
+    spec H x.
+    contradiction. *)
+Admitted.
+    
+Lemma hypothesis4 : Option2 P Q -> AllWaits P Q.
+Proof.
+  intro H; unfold Option2 in H.
+  unfold AllWaits.
+  intros p fst.
+  destruct H.
+  - unfold ExistsBox in H. destruct H. left. 
+Abort.
+
+End Exploration.
+
+(* Desirable properties *)
+Definition AllBox' P :=
+  forall p, first p = w ->
+            forall w', R w w' -> w' |= P.
+
+Lemma AllBox_equiv P : AllBox P <-> AllBox' P.
+Proof.
+  split.
+  - intro. unfold AllBox in H. unfold AllBox'.
+    intro p. intro fst.
+Abort.
+*)
+
+(* Encoding the model checking algorithm *)
